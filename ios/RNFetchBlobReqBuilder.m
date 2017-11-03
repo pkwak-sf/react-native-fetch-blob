@@ -267,32 +267,31 @@
                             }
                         }
                         
-                        if(!isHeic) {
-                            [RNFetchBlobFS readFile:orgPath encoding:nil onComplete:^(NSData *content, NSString * err) {
-                                if(err != nil)
-                                {
-                                    onComplete(formData, YES);
-                                    return;
-                                }
-                                NSString * filename = [field valueForKey:@"filename"];
-                                [formData appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
-                                [formData appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n", name, filename] dataUsingEncoding:NSUTF8StringEncoding]];
-                                [formData appendData:[[NSString stringWithFormat:@"Content-Type: %@\r\n\r\n", contentType] dataUsingEncoding:NSUTF8StringEncoding]];
-                                [formData appendData:content];
-                                [formData appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
-                                i++;
-                                if(i < count)
-                                {
-                                    __block NSDictionary * nextField = [form objectAtIndex:i];
-                                    getFieldData(nextField);
-                                }
-                                else
-                                {
-                                    onComplete(formData, NO);
-                                    getFieldData = nil;
-                                }
-                            }];
-                        }
+                        if(isHeic) return;
+                        [RNFetchBlobFS readFile:orgPath encoding:nil onComplete:^(NSData *content, NSString * err) {
+                            if(err != nil)
+                            {
+                                onComplete(formData, YES);
+                                return;
+                            }
+                            NSString * filename = [field valueForKey:@"filename"];
+                            [formData appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+                            [formData appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n", name, filename] dataUsingEncoding:NSUTF8StringEncoding]];
+                            [formData appendData:[[NSString stringWithFormat:@"Content-Type: %@\r\n\r\n", contentType] dataUsingEncoding:NSUTF8StringEncoding]];
+                            [formData appendData:content];
+                            [formData appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
+                            i++;
+                            if(i < count)
+                            {
+                                __block NSDictionary * nextField = [form objectAtIndex:i];
+                                getFieldData(nextField);
+                            }
+                            else
+                            {
+                                onComplete(formData, NO);
+                                getFieldData = nil;
+                            }
+                        }];
                         return ;
                     }
                     else
