@@ -268,6 +268,49 @@
                         }
                         
                         if(isHeic) return;
+                        
+                        if([orgPath hasPrefix:@"photos://"]) {
+                            NSString* localIdentifier = [orgPath stringByReplacingOccurrencesOfString:@"photos://" withString:@""];
+                            PHFetchOptions* assetFetchOptions = [PHFetchOptions new];
+                            PHFetchResult* results = [PHAsset fetchAssetsWithLocalIdentifiers:@[localIdentifier] options:assetFetchOptions];
+                            
+                            if (results.count > 0) {
+                                PHAsset* asset = [results firstObject];
+                                PHImageRequestOptions* options = [PHImageRequestOptions new];
+                                options.synchronous = NO;
+                                options.networkAccessAllowed = YES;
+                                options.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+                                
+                                [[PHImageManager defaultManager] requestImageForAsset:asset
+                                                                           targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                                                          contentMode:PHImageContentModeDefault
+                                                                              options:options
+                                                                        resultHandler:^(UIImage * _Nullable result, NSDictionary * _Nullable info) {
+                                                                            
+                                                                            NSData* imageData = UIImageJPEGRepresentation(result, 0.95);
+                                                                            NSString * filename = [field valueForKey:@"filename"];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n", name, filename] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"Content-Type: %@\r\n\r\n", contentType] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:imageData];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            i++;
+                                                                            if(i < count)
+                                                                            {
+                                                                                __block NSDictionary * nextField = [form objectAtIndex:i];
+                                                                                getFieldData(nextField);
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                onComplete(formData, NO);
+                                                                                getFieldData = nil;
+                                                                            }
+                                                                            
+                                                                        }];
+                            }
+                            return;
+                        }
+                        
                         [RNFetchBlobFS readFile:orgPath encoding:nil onComplete:^(NSData *content, NSString * err) {
                             if(err != nil)
                             {
