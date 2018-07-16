@@ -119,9 +119,13 @@ public class RNFetchBlobService extends IntentService implements ProgressListene
             builder.addHeader(key, mheaders.get(key));
         }
 
+        OkHttpClient existingClient = OkHttpClientProvider.getOkHttpClient();
+
         OkHttpClient client = new OkHttpClient.Builder()
                 .writeTimeout(24, TimeUnit.HOURS)
                 .readTimeout(24, TimeUnit.HOURS)
+                .cookieJar(new ReactCookieJarContainer())
+                .certificatePinner(existingClient.certificatePinner())
                 .build();
 
         final Call call =  client.newCall(builder.build());
