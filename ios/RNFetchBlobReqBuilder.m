@@ -12,6 +12,7 @@
 #import "RNFetchBlobConst.h"
 #import "RNFetchBlobFS.h"
 #import "IOS7Polyfill.h"
+#import <Photos/Photos.h>
 
 #if __has_include(<React/RCTAssert.h>)
 #import <React/RCTLog.h>
@@ -69,7 +70,7 @@
                 [mheaders setValue:[NSString stringWithFormat:@"%lu",[postData length]] forKey:@"Content-Length"];
                 [mheaders setValue:@"100-continue" forKey:@"Expect"];
                 // appaned boundary to content-type
-                [mheaders setValue:[NSString stringWithFormat:@"multipart/form-data; boundary=%@", boundary] forKey:@"content-type"];
+                [mheaders setValue:[NSString stringWithFormat:@"multipart/form-data; charset=utf-8; boundary=%@", boundary] forKey:@"content-type"];
                 [request setHTTPMethod: method];
                 [request setAllHTTPHeaderFields:mheaders];
                 onComplete(request, [formData length]);
@@ -221,7 +222,95 @@
                     {
                         NSString * orgPath = [content substringFromIndex:[FILE_PREFIX length]];
                         orgPath = [RNFetchBlobFS getPathOfAsset:orgPath];
-
+                        
+                        BOOL isHeic = false;
+                        
+                        if([[content lowercaseString] containsString:@".heic"]){
+                            NSURL* url = [NSURL URLWithString:orgPath];
+                            if ([url.scheme caseInsensitiveCompare:@"assets-library"] == NSOrderedSame) {
+                                PHFetchResult *results = [PHAsset fetchAssetsWithALAssetURLs:@[url] options:nil];
+                                if (results.count > 0) {
+                                    isHeic = true;
+                                    PHAsset* asset = [results firstObject];
+                                    PHImageRequestOptions* options = [PHImageRequestOptions new];
+                                    options.synchronous = NO;
+                                    options.networkAccessAllowed = YES;
+                                    options.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+                                    
+                                    [[PHImageManager defaultManager] requestImageForAsset:asset
+                                                                               targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                                                              contentMode:PHImageContentModeDefault
+                                                                                  options:options
+                                                                            resultHandler:^(UIImage * _Nullable result, NSDictionary * _Nullable info) {
+                                                                                
+                                                                                NSData* imageData = UIImageJPEGRepresentation(result, 0.95);
+                                                                                NSString * filename = [field valueForKey:@"filename"];
+                                                                                [formData appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                                [formData appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n", name, filename] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                                [formData appendData:[[NSString stringWithFormat:@"Content-Type: %@\r\n\r\n", contentType] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                                [formData appendData:imageData];
+                                                                                [formData appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                                i++;
+                                                                                if(i < count)
+                                                                                {
+                                                                                    __block NSDictionary * nextField = [form objectAtIndex:i];
+                                                                                    getFieldData(nextField);
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    onComplete(formData, NO);
+                                                                                    getFieldData = nil;
+                                                                                }
+                                                                                
+                                                                            }];
+                                }
+                            }
+                        }
+                        
+                        if(isHeic) return;
+                        
+                        if([orgPath hasPrefix:@"photos://"]) {
+                            NSString* localIdentifier = [orgPath stringByReplacingOccurrencesOfString:@"photos://" withString:@""];
+                            PHFetchOptions* assetFetchOptions = [PHFetchOptions new];
+                            PHFetchResult* results = [PHAsset fetchAssetsWithLocalIdentifiers:@[localIdentifier] options:assetFetchOptions];
+                            
+                            if (results.count > 0) {
+                                PHAsset* asset = [results firstObject];
+                                PHImageRequestOptions* options = [PHImageRequestOptions new];
+                                options.synchronous = NO;
+                                options.networkAccessAllowed = YES;
+                                options.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+                                
+                                [[PHImageManager defaultManager] requestImageForAsset:asset
+                                                                           targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                                                          contentMode:PHImageContentModeDefault
+                                                                              options:options
+                                                                        resultHandler:^(UIImage * _Nullable result, NSDictionary * _Nullable info) {
+                                                                            
+                                                                            NSData* imageData = UIImageJPEGRepresentation(result, 0.95);
+                                                                            NSString * filename = [field valueForKey:@"filename"];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n", name, filename] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"Content-Type: %@\r\n\r\n", contentType] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            [formData appendData:imageData];
+                                                                            [formData appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
+                                                                            i++;
+                                                                            if(i < count)
+                                                                            {
+                                                                                __block NSDictionary * nextField = [form objectAtIndex:i];
+                                                                                getFieldData(nextField);
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                onComplete(formData, NO);
+                                                                                getFieldData = nil;
+                                                                            }
+                                                                            
+                                                                        }];
+                            }
+                            return;
+                        }
+                        
                         [RNFetchBlobFS readFile:orgPath encoding:nil onComplete:^(NSData *content, NSString* code, NSString * err) {
                             if(err != nil)
                             {
