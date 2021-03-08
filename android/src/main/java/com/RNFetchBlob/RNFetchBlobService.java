@@ -79,7 +79,20 @@ public class RNFetchBlobService extends IntentService implements ProgressListene
                         : MediaType.parse("application/octet-stream");
                 if(filename != null && data.startsWith("RNFetchBlob-")) {
                     try {
-                        String normalizedUri = RNFetchBlobFS.normalizePath(data.replace(RNFetchBlobConst.FILE_PREFIX, ""));
+                        String normalizedUri;
+                        if (data.startsWith(RNFetchBlobConst.FILE_PREFIX)) {
+                            normalizedUri = RNFetchBlobFS.normalizePath(data.replace(RNFetchBlobConst.FILE_PREFIX, ""));
+
+                        } else if (data.startsWith(RNFetchBlobConst.CONTENT_PREFIX)) {
+                            normalizedUri = RNFetchBlobFS.normalizePath(data.replace(RNFetchBlobConst.CONTENT_PREFIX, ""));
+                        } else {
+                            String[] components = data.split("://");
+                            if (components.length > 1){
+                                normalizedUri = RNFetchBlobFS.normalizePath(components[components.length - 2] + "://" + components[components.length - 1]);
+                            } else {
+                                normalizedUri = RNFetchBlobFS.normalizePath(data);
+                            }
+                        }
                         file = new File(String.valueOf(Uri.parse(normalizedUri)));
                     } catch (Exception e) {
                         file = null;
